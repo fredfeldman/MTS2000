@@ -81,13 +81,14 @@ synchronously on the UI thread, which can hang the UI if the serial port is slow
 passes or reports through.
 
 **Fix:**
-- [ ] Either wire progress reporting through once codeplug block decoding exists, or drop the
+- [x] Either wire progress reporting through once codeplug block decoding exists, or drop the
       parameter until then to avoid dead API surface.
 
 ### 7. Add a view-model-level regression test for #2
 **Fix:**
-- [ ] Once `IsBusy` exists, add a `MainViewModelTests` (new test file) using `FakeRadioTransport`
-      that asserts a second command invocation while `IsBusy` is true is a no-op / blocked.
+- [x] Once `IsBusy` exists, add a `MainViewModelTests` (new test file) using a fake
+      `IRadioCommunicationService` that asserts a second command invocation while `IsBusy` is
+      true is a no-op / blocked.
 
 ## Definition of done
 - All checkboxes above checked.

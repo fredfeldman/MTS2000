@@ -32,7 +32,7 @@ public interface IRadioCommunicationService
 
     Task WriteMemoryAsync(int address, byte[] data, CancellationToken cancellationToken = default);
 
-    Task<Models.Codeplug> ReadCodeplugAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default);
+    Task<Models.Codeplug> ReadCodeplugAsync(CancellationToken cancellationToken = default);
 
-    Task WriteCodeplugAsync(Models.Codeplug codeplug, IProgress<string>? progress = null, CancellationToken cancellationToken = default);
+    Task WriteCodeplugAsync(Models.Codeplug codeplug, CancellationToken cancellationToken = default);
 }

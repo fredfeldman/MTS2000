@@ -66,7 +66,7 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
         return Task.Run(() => session.WriteEeprom(address, data), cancellationToken);
     }
 
-    public Task<Codeplug> ReadCodeplugAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    public Task<Codeplug> ReadCodeplugAsync(CancellationToken cancellationToken = default)
     {
         EnsureConnected();
 
@@ -79,7 +79,7 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
             "Low-level memory access is available via ReadMemoryAsync.");
     }
 
-    public Task WriteCodeplugAsync(Codeplug codeplug, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    public Task WriteCodeplugAsync(Codeplug codeplug, CancellationToken cancellationToken = default)
     {
         EnsureConnected();
 

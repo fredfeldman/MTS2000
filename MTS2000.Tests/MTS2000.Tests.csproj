@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -20,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MTS2000.Core\MTS2000.Core.csproj" />
+    <ProjectReference Include="..\MTS2000.App\MTS2000.App.csproj" />
   </ItemGroup>
 
 </Project>
