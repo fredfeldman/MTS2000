@@ -11,21 +11,37 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
 
     public RadioConnectionState State { get; private set; } = RadioConnectionState.Disconnected;
 
+    public event EventHandler<string>? StatusChanged;
+
     public IReadOnlyList<string> GetAvailablePortNames() => SerialPort.GetPortNames();
 
     public void Connect(string portName, int baudRate = 9600)
     {
-        _session?.Dispose();
+        DetachSession();
         _session = new RadioProgrammingSession(portName);
+        _session.StatusChanged += OnSessionStatusChanged;
         State = RadioConnectionState.Connected;
     }
 
     public void Disconnect()
     {
-        _session?.Dispose();
-        _session = null;
+        DetachSession();
         State = RadioConnectionState.Disconnected;
     }
+
+    private void DetachSession()
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        _session.StatusChanged -= OnSessionStatusChanged;
+        _session.Dispose();
+        _session = null;
+    }
+
+    private void OnSessionStatusChanged(object? sender, string status) => StatusChanged?.Invoke(this, status);
 
     /// <summary>Puts the radio in programming mode and reads back its firmware version, proving the control-bus link is alive.</summary>
     public Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)

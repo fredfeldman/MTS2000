@@ -52,10 +52,10 @@ during an in-flight read, can run overlapping operations against the same
 never subscribes, so retries/timeouts are invisible until a terminal exception.
 
 **Fix:**
-- [ ] Add `event EventHandler<string>? StatusChanged;` to `IRadioCommunicationService`.
-- [ ] In `SerialRadioCommunicationService.Connect()`, subscribe to
+- [x] Add `event EventHandler<string>? StatusChanged;` to `IRadioCommunicationService`.
+- [x] In `SerialRadioCommunicationService.Connect()`, subscribe to
       `_session.StatusChanged` and re-raise it.
-- [ ] In `MainViewModel`, subscribe once (in the constructor) and set `StatusMessage` from the
+- [x] In `MainViewModel`, subscribe once (in the constructor) and set `StatusMessage` from the
       forwarded event.
 
 ### 4. Disconnect on window close

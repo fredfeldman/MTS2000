@@ -17,6 +17,9 @@ public interface IRadioCommunicationService
 {
     RadioConnectionState State { get; }
 
+    /// <summary>Raised with granular protocol-level status text (retries, timeouts, mode transitions).</summary>
+    event EventHandler<string>? StatusChanged;
+
     IReadOnlyList<string> GetAvailablePortNames();
 
     void Connect(string portName, int baudRate = 9600);

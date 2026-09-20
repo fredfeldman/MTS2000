@@ -58,12 +58,28 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(IRadioCommunicationService radioService)
     {
         _radioService = radioService;
+        _radioService.StatusChanged += OnRadioStatusChanged;
         SelectedZone = Codeplug.Zones.FirstOrDefault();
         SelectedChannel = SelectedZone?.Channels.FirstOrDefault();
 
         if (_appSettings.LastPortName is { } lastPort && AvailablePortNames.Contains(lastPort))
         {
             SelectedPortName = lastPort;
+        }
+    }
+
+    /// <summary>Forwards low-level protocol status (retries, timeouts, mode transitions) to the status bar.
+    /// Raised from a background thread by the radio service, so it must hop to the UI thread.</summary>
+    private void OnRadioStatusChanged(object? sender, string status)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            StatusMessage = status;
+        }
+        else
+        {
+            dispatcher.BeginInvoke(() => StatusMessage = status);
         }
     }
 
