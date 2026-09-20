@@ -11,6 +11,8 @@ A WPF (.NET) codeplug editor and programming utility for the Motorola MTS2000
 - Connect to a radio over a serial (RIB/USB-serial) cable, enter programming mode, and
   read back the firmware version to prove the link is alive.
 - Low-level EEPROM memory read/write primitives for the real SB9600/SBEP transport.
+- Raw EEPROM backup/restore: read an address range to a `.bin` file, or write a `.bin` file
+  back to the radio (this does not decode channels/zones - see below).
 
 ## What it doesn't do (yet)
 
