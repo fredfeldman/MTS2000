@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.IO.Ports;
 
 namespace MTS2000.Core.Protocol;
 
@@ -14,16 +13,20 @@ public sealed class RadioProgrammingSession : IDisposable
 {
     private const int MaxRetries = 4;
 
-    private readonly SerialPort _port;
+    private readonly ISerialTransport _port;
     private bool _extendedModeActive;
 
     public event EventHandler<string>? StatusChanged;
 
-    public RadioProgrammingSession(string comPort)
+    public RadioProgrammingSession(string comPort) : this(new SerialPortTransport(comPort))
     {
-        _port = new SerialPort(comPort) { BaudRate = 9600, ReadTimeout = 2500 };
-        _port.Open();
-        Report($"Opened {comPort}.");
+    }
+
+    /// <summary>Constructs a session over an arbitrary transport, e.g. a fake radio in tests.</summary>
+    public RadioProgrammingSession(ISerialTransport transport)
+    {
+        _port = transport;
+        Report("Transport ready.");
     }
 
     public void EnterProgrammingMode()
