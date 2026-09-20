@@ -63,7 +63,7 @@ never subscribes, so retries/timeouts are invisible until a terminal exception.
 radio connected leaves the COM port open until process exit.
 
 **Fix:**
-- [ ] Add a `Closing` (or `Closed`) handler in `MainWindow.xaml.cs` that calls
+- [x] Add a `Closing` (or `Closed`) handler in `MainWindow.xaml.cs` that calls
       `DisconnectCommand.Execute(null)` (or exposes a `Shutdown()` method on `MainViewModel`).
 
 ### 5. Make `Connect()` non-blocking
@@ -71,7 +71,7 @@ radio connected leaves the COM port open until process exit.
 synchronously on the UI thread, which can hang the UI if the serial port is slow to open.
 
 **Fix:**
-- [ ] Change `ConnectCommand` to `async Task ConnectAsync()` and wrap the connect call in
+- [x] Change `ConnectCommand` to `async Task ConnectAsync()` and wrap the connect call in
       `Task.Run`, consistent with the other radio commands.
 
 ## Low priority / cleanup

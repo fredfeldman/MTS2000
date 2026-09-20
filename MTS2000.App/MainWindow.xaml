@@ -39,7 +39,7 @@
                 <TextBlock Text="Port:" VerticalAlignment="Center" Margin="4,0" />
                 <ComboBox Width="100" ItemsSource="{Binding AvailablePortNames}" SelectedItem="{Binding SelectedPortName}" />
                 <Button Content="Refresh" Command="{Binding RefreshPortsCommand}" />
-                <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" />
+                <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" />
                 <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
                 <Separator />
                 <Button Content="Get Firmware Version" Command="{Binding GetFirmwareVersionCommand}" IsEnabled="{Binding CanOperateRadio}" />

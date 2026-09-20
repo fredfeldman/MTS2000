@@ -45,9 +45,20 @@ public partial class MainViewModel : ObservableObject
     /// <summary>True when a radio command can be safely started: connected and no other radio operation is already in flight.</summary>
     public bool CanOperateRadio => IsConnected && !IsBusy;
 
-    partial void OnIsConnectedChanged(bool value) => OnPropertyChanged(nameof(CanOperateRadio));
+    /// <summary>True when it's safe to attempt a connection: not already connected and nothing else in flight.</summary>
+    public bool CanConnect => !IsConnected && !IsBusy;
 
-    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanOperateRadio));
+    partial void OnIsConnectedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanOperateRadio));
+        OnPropertyChanged(nameof(CanConnect));
+    }
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanOperateRadio));
+        OnPropertyChanged(nameof(CanConnect));
+    }
 
     public IReadOnlyList<string> AvailablePortNames => _radioService.GetAvailablePortNames();
 
@@ -192,7 +203,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Connect()
+    private async Task ConnectAsync()
     {
         if (string.IsNullOrEmpty(SelectedPortName))
         {
@@ -200,17 +211,28 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        if (!TryStartBusy())
+        {
+            return;
+        }
+
+        var portName = SelectedPortName;
         try
         {
-            _radioService.Connect(SelectedPortName);
+            StatusMessage = $"Connecting to {portName}...";
+            await Task.Run(() => _radioService.Connect(portName));
             IsConnected = true;
-            StatusMessage = $"Connected to {SelectedPortName}.";
-            _appSettings.LastPortName = SelectedPortName;
+            StatusMessage = $"Connected to {portName}.";
+            _appSettings.LastPortName = portName;
             _appSettings.Save();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to connect: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -226,6 +248,16 @@ public partial class MainViewModel : ObservableObject
         _radioService.Disconnect();
         IsConnected = false;
         StatusMessage = "Disconnected.";
+    }
+
+    /// <summary>Called when the app is closing: releases the COM port if still connected, regardless of <see cref="IsBusy"/>.</summary>
+    public void Shutdown()
+    {
+        if (IsConnected)
+        {
+            _radioService.Disconnect();
+            IsConnected = false;
+        }
     }
 
     [RelayCommand]

@@ -21,5 +21,6 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = new MainViewModel();
+        Closing += (_, _) => (DataContext as MainViewModel)?.Shutdown();
     }
 }
