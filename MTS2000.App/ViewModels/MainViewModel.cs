@@ -1,7 +1,9 @@
 using System.IO;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
+using MTS2000.App.Services;
 using MTS2000.Core.Models;
 using MTS2000.Core.Services;
 
@@ -11,6 +13,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly CodeplugFileService _fileService = new();
     private readonly IRadioCommunicationService _radioService;
+    private readonly AppSettings _appSettings = AppSettings.Load();
 
     [ObservableProperty]
     private Codeplug _codeplug = Codeplug.CreateDefault();
@@ -41,6 +44,11 @@ public partial class MainViewModel : ObservableObject
         _radioService = radioService;
         SelectedZone = Codeplug.Zones.FirstOrDefault();
         SelectedChannel = SelectedZone?.Channels.FirstOrDefault();
+
+        if (_appSettings.LastPortName is { } lastPort && AvailablePortNames.Contains(lastPort))
+        {
+            SelectedPortName = lastPort;
+        }
     }
 
     [RelayCommand]
@@ -56,6 +64,11 @@ public partial class MainViewModel : ObservableObject
     {
         zone ??= SelectedZone;
         if (zone is null)
+        {
+            return;
+        }
+
+        if (!ConfirmDelete($"Delete zone \"{zone.Name}\" and all its channels?"))
         {
             return;
         }
@@ -86,9 +99,17 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
+        if (!ConfirmDelete($"Delete channel \"{channel.Name}\"?"))
+        {
+            return;
+        }
+
         SelectedZone.Channels.Remove(channel);
         SelectedChannel = SelectedZone.Channels.FirstOrDefault();
     }
+
+    private static bool ConfirmDelete(string message) =>
+        MessageBox.Show(message, "Confirm delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
     [RelayCommand]
     private void OpenCodeplug()
@@ -152,6 +173,8 @@ public partial class MainViewModel : ObservableObject
             _radioService.Connect(SelectedPortName);
             IsConnected = true;
             StatusMessage = $"Connected to {SelectedPortName}.";
+            _appSettings.LastPortName = SelectedPortName;
+            _appSettings.Save();
         }
         catch (Exception ex)
         {
