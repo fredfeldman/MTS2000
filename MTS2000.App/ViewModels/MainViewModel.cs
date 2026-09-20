@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -42,6 +44,10 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private int _rawMemoryLength = 256;
 
+    /// <summary>True once the codeplug has been edited since it was created/loaded/saved.</summary>
+    [ObservableProperty]
+    private bool _isDirty;
+
     /// <summary>True when a radio command can be safely started: connected and no other radio operation is already in flight.</summary>
     public bool CanOperateRadio => IsConnected && !IsBusy;
 
@@ -62,6 +68,8 @@ public partial class MainViewModel : ObservableObject
 
     public IReadOnlyList<string> AvailablePortNames => _radioService.GetAvailablePortNames();
 
+    public bool HasNoAvailablePorts => AvailablePortNames.Count == 0;
+
     public MainViewModel() : this(new SerialRadioCommunicationService())
     {
     }
@@ -70,6 +78,7 @@ public partial class MainViewModel : ObservableObject
     {
         _radioService = radioService;
         _radioService.StatusChanged += OnRadioStatusChanged;
+        AttachDirtyTracking(Codeplug);
         SelectedZone = Codeplug.Zones.FirstOrDefault();
         SelectedChannel = SelectedZone?.Channels.FirstOrDefault();
 
@@ -78,6 +87,123 @@ public partial class MainViewModel : ObservableObject
             SelectedPortName = lastPort;
         }
     }
+
+    partial void OnCodeplugChanged(Codeplug? oldValue, Codeplug newValue)
+    {
+        if (oldValue is not null)
+        {
+            DetachDirtyTracking(oldValue);
+        }
+
+        AttachDirtyTracking(newValue);
+        IsDirty = false;
+    }
+
+    private void AttachDirtyTracking(Codeplug codeplug)
+    {
+        codeplug.Settings.PropertyChanged += MarkDirty;
+        codeplug.Zones.CollectionChanged += OnZonesCollectionChanged;
+        foreach (var zone in codeplug.Zones)
+        {
+            AttachZone(zone);
+        }
+    }
+
+    private void DetachDirtyTracking(Codeplug codeplug)
+    {
+        codeplug.Settings.PropertyChanged -= MarkDirty;
+        codeplug.Zones.CollectionChanged -= OnZonesCollectionChanged;
+        foreach (var zone in codeplug.Zones)
+        {
+            DetachZone(zone);
+        }
+    }
+
+    private void AttachZone(Zone zone)
+    {
+        zone.PropertyChanged += MarkDirty;
+        zone.Channels.CollectionChanged += OnChannelsCollectionChanged;
+        foreach (var channel in zone.Channels)
+        {
+            AttachChannel(channel);
+        }
+    }
+
+    private void DetachZone(Zone zone)
+    {
+        zone.PropertyChanged -= MarkDirty;
+        zone.Channels.CollectionChanged -= OnChannelsCollectionChanged;
+        foreach (var channel in zone.Channels)
+        {
+            DetachChannel(channel);
+        }
+    }
+
+    private void AttachChannel(Channel channel) => channel.PropertyChanged += MarkDirty;
+
+    private void DetachChannel(Channel channel) => channel.PropertyChanged -= MarkDirty;
+
+    private void OnZonesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null)
+        {
+            foreach (Zone zone in e.NewItems)
+            {
+                AttachZone(zone);
+            }
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (Zone zone in e.OldItems)
+            {
+                DetachZone(zone);
+            }
+        }
+
+        IsDirty = true;
+    }
+
+    private void OnChannelsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null)
+        {
+            foreach (Channel channel in e.NewItems)
+            {
+                AttachChannel(channel);
+            }
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (Channel channel in e.OldItems)
+            {
+                DetachChannel(channel);
+            }
+        }
+
+        IsDirty = true;
+    }
+
+    private void MarkDirty(object? sender, PropertyChangedEventArgs e) => IsDirty = true;
+
+    /// <summary>Prompts to confirm discarding unsaved changes if there are any; returns true if it's OK to proceed.</summary>
+    private bool ConfirmDiscardIfDirty(string action)
+    {
+        if (!IsDirty)
+        {
+            return true;
+        }
+
+        return MessageBox.Show(
+            $"You have unsaved codeplug changes. {action} anyway?",
+            "Unsaved changes",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
+    /// <summary>Called from the window's Closing handler; returns false if the close should be cancelled.</summary>
+    public bool ConfirmClose() => ConfirmDiscardIfDirty("Close the application");
 
     /// <summary>Forwards low-level protocol status (retries, timeouts, mode transitions) to the status bar.
     /// Raised from a background thread by the radio service, so it must hop to the UI thread.</summary>
@@ -157,6 +283,11 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void OpenCodeplug()
     {
+        if (!ConfirmDiscardIfDirty("Discard your unsaved changes and open a different codeplug"))
+        {
+            return;
+        }
+
         var dialog = new OpenFileDialog { Filter = "Codeplug files (*.json)|*.json|All files (*.*)|*.*" };
         if (dialog.ShowDialog() != true)
         {
@@ -189,6 +320,7 @@ public partial class MainViewModel : ObservableObject
         {
             _fileService.Save(Codeplug, dialog.FileName);
             StatusMessage = $"Saved {Path.GetFileName(dialog.FileName)}.";
+            IsDirty = false;
         }
         catch (Exception ex)
         {
@@ -200,6 +332,7 @@ public partial class MainViewModel : ObservableObject
     private void RefreshPorts()
     {
         OnPropertyChanged(nameof(AvailablePortNames));
+        OnPropertyChanged(nameof(HasNoAvailablePorts));
     }
 
     [RelayCommand]
@@ -278,6 +411,11 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ReadFromRadioAsync()
     {
+        if (!ConfirmDiscardIfDirty("Discard your unsaved changes and read a codeplug from the radio"))
+        {
+            return;
+        }
+
         if (!TryStartBusy())
         {
             return;

@@ -12,6 +12,8 @@
     <Window.Resources>
         <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         <converters:NullToBooleanConverter x:Key="NullToBooleanConverter" />
+        <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <ObjectDataProvider x:Key="BandwidthValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
             <ObjectDataProvider.MethodParameters>
                 <x:Type TypeName="models:ChannelBandwidth" />
@@ -38,6 +40,8 @@
                 <Separator />
                 <TextBlock Text="Port:" VerticalAlignment="Center" Margin="4,0" />
                 <ComboBox Width="100" ItemsSource="{Binding AvailablePortNames}" SelectedItem="{Binding SelectedPortName}" />
+                <TextBlock Text="No ports found - plug in your cable and click Refresh" VerticalAlignment="Center" Margin="4,0"
+                           Foreground="Gray" FontStyle="Italic" Visibility="{Binding HasNoAvailablePorts, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Button Content="Refresh" Command="{Binding RefreshPortsCommand}" />
                 <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" />
                 <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
@@ -62,7 +66,8 @@
                         <TextBlock Text="Zones" FontWeight="Bold" DockPanel.Dock="Top" Margin="0,0,0,4" />
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                             <Button Content="Add" Width="60" Margin="0,0,4,0" Command="{Binding AddZoneCommand}" />
-                            <Button Content="Remove" Width="60" Command="{Binding RemoveZoneCommand}" CommandParameter="{Binding SelectedZone}" />
+                            <Button Content="Remove" Width="60" Command="{Binding RemoveZoneCommand}" CommandParameter="{Binding SelectedZone}"
+                                    IsEnabled="{Binding SelectedZone, Converter={StaticResource NullToBooleanConverter}}" />
                         </StackPanel>
                         <ListBox ItemsSource="{Binding Codeplug.Zones}" SelectedItem="{Binding SelectedZone}" DisplayMemberPath="Name" />
                     </DockPanel>
@@ -72,39 +77,44 @@
                         <TextBlock Text="Channels" FontWeight="Bold" DockPanel.Dock="Top" Margin="0,0,0,4" />
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                             <Button Content="Add" Width="60" Margin="0,0,4,0" Command="{Binding AddChannelCommand}" />
-                            <Button Content="Remove" Width="60" Command="{Binding RemoveChannelCommand}" CommandParameter="{Binding SelectedChannel}" />
+                            <Button Content="Remove" Width="60" Command="{Binding RemoveChannelCommand}" CommandParameter="{Binding SelectedChannel}"
+                                    IsEnabled="{Binding SelectedChannel, Converter={StaticResource NullToBooleanConverter}}" />
                         </StackPanel>
                         <ListBox ItemsSource="{Binding SelectedZone.Channels}" SelectedItem="{Binding SelectedChannel}" DisplayMemberPath="Name" />
                     </DockPanel>
 
                     <!-- Channel editor -->
-                    <StackPanel Grid.Column="2" Margin="12,4,4,4" DataContext="{Binding SelectedChannel}"
-                                IsEnabled="{Binding Converter={StaticResource NullToBooleanConverter}}">
-                        <TextBlock Text="Channel Details" FontWeight="Bold" Margin="0,0,0,8" />
+                    <Grid Grid.Column="2" Margin="12,4,4,4">
+                        <TextBlock Text="Select or add a channel to view or edit its details." Foreground="Gray" FontStyle="Italic"
+                                   Visibility="{Binding SelectedChannel, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}" />
+                        <StackPanel DataContext="{Binding SelectedChannel}"
+                                    Visibility="{Binding Converter={StaticResource NullToVisibilityConverter}}">
+                            <TextBlock Text="Channel Details" FontWeight="Bold" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Name" />
-                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBlock Text="Name" />
+                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Receive Frequency (MHz)" />
-                        <TextBox Text="{Binding ReceiveFrequencyMhz, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBlock Text="Receive Frequency (MHz)" />
+                            <TextBox Text="{Binding ReceiveFrequencyMhz, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Transmit Frequency (MHz)" />
-                        <TextBox Text="{Binding TransmitFrequencyMhz, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBlock Text="Transmit Frequency (MHz)" />
+                            <TextBox Text="{Binding TransmitFrequencyMhz, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Receive Tone" />
-                        <TextBox Text="{Binding ReceiveTone, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBlock Text="Receive Tone" />
+                            <TextBox Text="{Binding ReceiveTone, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Transmit Tone" />
-                        <TextBox Text="{Binding TransmitTone, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBlock Text="Transmit Tone" />
+                            <TextBox Text="{Binding TransmitTone, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Bandwidth" />
-                        <ComboBox ItemsSource="{Binding Source={StaticResource BandwidthValues}}" SelectedItem="{Binding Bandwidth}" Margin="0,0,0,8" />
+                            <TextBlock Text="Bandwidth" />
+                            <ComboBox ItemsSource="{Binding Source={StaticResource BandwidthValues}}" SelectedItem="{Binding Bandwidth}" Margin="0,0,0,8" />
 
-                        <TextBlock Text="Scan List Mode" />
-                        <ComboBox ItemsSource="{Binding Source={StaticResource ScanListModeValues}}" SelectedItem="{Binding ScanListMode}" Margin="0,0,0,8" />
+                            <TextBlock Text="Scan List Mode" />
+                            <ComboBox ItemsSource="{Binding Source={StaticResource ScanListModeValues}}" SelectedItem="{Binding ScanListMode}" Margin="0,0,0,8" />
 
-                        <CheckBox Content="Transmit Allowed" IsChecked="{Binding IsTransmitAllowed}" Margin="0,4,0,0" />
-                    </StackPanel>
+                            <CheckBox Content="Transmit Allowed" IsChecked="{Binding IsTransmitAllowed}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </TabItem>
 
