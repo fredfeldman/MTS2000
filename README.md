@@ -3,6 +3,8 @@
 A WPF (.NET) codeplug editor and programming utility for the Motorola MTS2000
 ("Jedi" series) portable radio.
 
+Repository: https://github.com/fredfeldman/MTS2000
+
 ## What it does
 
 - Edit a codeplug (zones, channels, frequencies, tones, bandwidth, scan settings) in a
@@ -13,6 +15,8 @@ A WPF (.NET) codeplug editor and programming utility for the Motorola MTS2000
 - Low-level EEPROM memory read/write primitives for the real SB9600/SBEP transport.
 - Raw EEPROM backup/restore: read an address range to a `.bin` file, or write a `.bin` file
   back to the radio (this does not decode channels/zones - see below).
+- Remembers the last-used COM port between sessions and confirms before deleting a zone
+  or channel.
 
 ## What it doesn't do (yet)
 
@@ -28,7 +32,8 @@ real and working — see [Protocol reference](#protocol-reference) below.
 | Project | Purpose |
 |---|---|
 | `MTS2000.Core` | Models (`Codeplug`, `Zone`, `Channel`, `RadioSettings`), codeplug JSON save/load, and the radio communication layer (`Services/`, `Protocol/`). |
-| `MTS2000.App` | WPF UI (MVVM via CommunityToolkit.Mvvm): zone/channel editor, radio settings tab, connection toolbar. |
+| `MTS2000.App` | WPF UI (MVVM via CommunityToolkit.Mvvm): zone/channel editor, radio settings tab, raw memory tab, connection toolbar. |
+| `MTS2000.Tests` | xUnit tests for the protocol framing (`ControlBusFrame`, `ExtendedProtocolFrame`) and codeplug JSON round-tripping. |
 
 ### Protocol reference
 
@@ -59,6 +64,12 @@ GNU General Public License v3.0 — see [LICENSE](LICENSE).
 ```powershell
 dotnet build MTS2000.slnx
 dotnet run --project MTS2000.App
+```
+
+## Running the tests
+
+```powershell
+dotnet test MTS2000.slnx
 ```
 
 ## Disclaimer
