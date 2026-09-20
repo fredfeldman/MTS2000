@@ -43,15 +43,12 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
 
     private void OnSessionStatusChanged(object? sender, string status) => StatusChanged?.Invoke(this, status);
 
-    /// <summary>Puts the radio in programming mode and reads back its firmware version, proving the control-bus link is alive.</summary>
+    /// <summary>Reads back the radio's firmware version, proving the control-bus link is alive.
+    /// Puts the radio in programming mode first if that hasn't happened yet this session.</summary>
     public Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
     {
         var session = EnsureConnected();
-        return Task.Run(() =>
-        {
-            session.EnterProgrammingMode();
-            return session.QueryFirmwareVersion();
-        }, cancellationToken);
+        return Task.Run(session.QueryFirmwareVersion, cancellationToken);
     }
 
     public Task<byte[]> ReadMemoryAsync(int address, int length, CancellationToken cancellationToken = default)

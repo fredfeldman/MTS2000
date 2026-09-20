@@ -250,14 +250,29 @@ public partial class MainViewModel : ObservableObject
         StatusMessage = "Disconnected.";
     }
 
-    /// <summary>Called when the app is closing: releases the COM port if still connected, regardless of <see cref="IsBusy"/>.</summary>
+    /// <summary>
+    /// Called when the app is closing: releases the COM port if still connected. Skips
+    /// disconnecting while an operation is in flight (<see cref="IsBusy"/>) to avoid disposing
+    /// the port out from under a background read/write; the process exiting will reclaim the
+    /// handle anyway. Never throws, since this runs synchronously from <c>Window.Closing</c>.
+    /// </summary>
     public void Shutdown()
     {
-        if (IsConnected)
+        if (!IsConnected || IsBusy)
+        {
+            return;
+        }
+
+        try
         {
             _radioService.Disconnect();
-            IsConnected = false;
         }
+        catch
+        {
+            // Best-effort on the way out; the process is exiting regardless.
+        }
+
+        IsConnected = false;
     }
 
     [RelayCommand]
