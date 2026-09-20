@@ -56,4 +56,26 @@ public class RadioProgrammingSessionTests
 
         Assert.Equal(0x7A, result[0]);
     }
+
+    [Fact]
+    public void ReadEeprom_WithoutExplicitEnterProgrammingMode_EntersItAutomatically()
+    {
+        using var transport = new FakeRadioTransport();
+        using var session = new RadioProgrammingSession(transport);
+
+        session.ReadEeprom(0x0000, 1);
+
+        Assert.True(transport.SawEnterProgrammingMode);
+    }
+
+    [Fact]
+    public void WriteEeprom_WithoutExplicitEnterProgrammingMode_EntersItAutomatically()
+    {
+        using var transport = new FakeRadioTransport();
+        using var session = new RadioProgrammingSession(transport);
+
+        session.WriteEeprom(0x0000, [0x01]);
+
+        Assert.True(transport.SawEnterProgrammingMode);
+    }
 }

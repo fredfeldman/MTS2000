@@ -13,6 +13,9 @@ public sealed class FakeRadioTransport : ISerialTransport
 {
     public byte[] Eeprom { get; } = new byte[0x10000];
 
+    /// <summary>Set once a control-bus frame matching <see cref="ControlBusCommands.EnterProgrammingMode"/> is observed.</summary>
+    public bool SawEnterProgrammingMode { get; private set; }
+
     private readonly Queue<byte> _toSession = new();
 
     public bool DtrEnable { get; set; }
@@ -40,6 +43,14 @@ public sealed class FakeRadioTransport : ISerialTransport
     private void RespondToControlBusFrame(byte[] sent)
     {
         var frame = ControlBusFrame.TryParse(sent);
+        if (frame is not null && !frame.IsMalformed)
+        {
+            var programmingMode = ControlBusCommands.EnterProgrammingMode;
+            if (frame.Device == programmingMode.Device && frame.Command == programmingMode.Command)
+            {
+                SawEnterProgrammingMode = true;
+            }
+        }
 
         // Whether the radio replies is implicit in the command itself (not carried on the
         // wire): only the firmware-version query gets a follow-up frame back.

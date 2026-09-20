@@ -15,13 +15,13 @@ Goal: fix the correctness/safety issues found, in priority order. Each task shou
 programming mode.
 
 **Fix:**
-- [ ] Add an internal "has programming mode been entered this session" flag to
+- [x] Add an internal "has programming mode been entered this session" flag to
       `RadioProgrammingSession` (or just make `EnterProgrammingMode()` idempotent per-session and
       call it from `ReadEeprom`/`WriteEeprom` before `ActivateExtendedModeIfNeeded()`).
 - [ ] Alternative/simpler: call `session.EnterProgrammingMode()` once inside
       `SerialRadioCommunicationService.Connect()` right after opening the session, so every
       subsequent call (read, write, firmware query) can assume programming mode is already active.
-- [ ] Add a `RadioProgrammingSessionTests` case using `FakeRadioTransport` asserting
+- [x] Add a `RadioProgrammingSessionTests` case using `FakeRadioTransport` asserting
       `ReadEeprom`/`WriteEeprom` work without an explicit prior `EnterProgrammingMode()` call (i.e.
       the session handles it internally), or asserting `Connect()` triggers it once.
 
@@ -34,15 +34,15 @@ during an in-flight read, can run overlapping operations against the same
 `Task.Run` closure.
 
 **Fix:**
-- [ ] Add `[ObservableProperty] private bool _isBusy;` to `MainViewModel`.
-- [ ] Set `IsBusy = true` at the start / `false` at the end (try/finally) of every async radio
+- [x] Add `[ObservableProperty] private bool _isBusy;` to `MainViewModel`.
+- [x] Set `IsBusy = true` at the start / `false` at the end (try/finally) of every async radio
       command (`ReadFromRadioAsync`, `WriteToRadioAsync`, `GetFirmwareVersionAsync`,
       `ReadRawMemoryAsync`, `WriteRawMemoryAsync`).
-- [ ] Bind `IsEnabled` on Connect/Disconnect/Get Firmware Version/Read/Write/Raw Memory buttons to
+- [x] Bind `IsEnabled` on Connect/Disconnect/Get Firmware Version/Read/Write/Raw Memory buttons to
       also require `!IsBusy` (combine with existing `IsConnected` binding via a multi-binding
       converter, or add a computed `CanOperateRadio => IsConnected && !IsBusy` property with
       `OnPropertyChanged` raised from both `IsConnected` and `IsBusy` setters).
-- [ ] Make `Disconnect()` refuse (or wait) while `IsBusy` is true, or at minimum show a status
+- [x] Make `Disconnect()` refuse (or wait) while `IsBusy` is true, or at minimum show a status
       message instead of disposing mid-operation.
 
 ## Medium priority

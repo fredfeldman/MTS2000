@@ -15,6 +15,7 @@ public sealed class RadioProgrammingSession : IDisposable
 
     private readonly ISerialTransport _port;
     private bool _extendedModeActive;
+    private bool _programmingModeEntered;
 
     public event EventHandler<string>? StatusChanged;
 
@@ -33,10 +34,20 @@ public sealed class RadioProgrammingSession : IDisposable
     {
         Transact(ControlBusCommands.EnterProgrammingMode, awaitReply: false);
         Thread.Sleep(1000);
+        _programmingModeEntered = true;
+    }
+
+    private void EnsureProgrammingMode()
+    {
+        if (!_programmingModeEntered)
+        {
+            EnterProgrammingMode();
+        }
     }
 
     public decimal QueryFirmwareVersion()
     {
+        EnsureProgrammingMode();
         DeactivateExtendedModeIfNeeded();
 
         var reply = Transact(ControlBusCommands.FirmwareVersionQuery, awaitReply: true)
@@ -106,6 +117,8 @@ public sealed class RadioProgrammingSession : IDisposable
 
     private void ActivateExtendedModeIfNeeded()
     {
+        EnsureProgrammingMode();
+
         if (_extendedModeActive)
         {
             return;

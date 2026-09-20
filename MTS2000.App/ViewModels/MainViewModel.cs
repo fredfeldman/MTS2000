@@ -34,10 +34,20 @@ public partial class MainViewModel : ObservableObject
     private bool _isConnected;
 
     [ObservableProperty]
+    private bool _isBusy;
+
+    [ObservableProperty]
     private string _rawMemoryAddressHex = "0000";
 
     [ObservableProperty]
     private int _rawMemoryLength = 256;
+
+    /// <summary>True when a radio command can be safely started: connected and no other radio operation is already in flight.</summary>
+    public bool CanOperateRadio => IsConnected && !IsBusy;
+
+    partial void OnIsConnectedChanged(bool value) => OnPropertyChanged(nameof(CanOperateRadio));
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanOperateRadio));
 
     public IReadOnlyList<string> AvailablePortNames => _radioService.GetAvailablePortNames();
 
@@ -191,6 +201,12 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void Disconnect()
     {
+        if (IsBusy)
+        {
+            StatusMessage = "Cannot disconnect while an operation is in progress.";
+            return;
+        }
+
         _radioService.Disconnect();
         IsConnected = false;
         StatusMessage = "Disconnected.";
@@ -199,6 +215,11 @@ public partial class MainViewModel : ObservableObject
     [RelayCommand]
     private async Task ReadFromRadioAsync()
     {
+        if (!TryStartBusy())
+        {
+            return;
+        }
+
         try
         {
             StatusMessage = "Reading codeplug from radio...";
@@ -211,11 +232,20 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = $"Read failed: {ex.Message}";
         }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
     private async Task GetFirmwareVersionAsync()
     {
+        if (!TryStartBusy())
+        {
+            return;
+        }
+
         try
         {
             StatusMessage = "Requesting firmware version...";
@@ -226,11 +256,20 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = $"Firmware version request failed: {ex.Message}";
         }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
     private async Task WriteToRadioAsync()
     {
+        if (!TryStartBusy())
+        {
+            return;
+        }
+
         try
         {
             StatusMessage = "Writing codeplug to radio...";
@@ -240,6 +279,10 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusMessage = $"Write failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
         }
     }
 
@@ -258,6 +301,11 @@ public partial class MainViewModel : ObservableObject
 
         var dialog = new SaveFileDialog { Filter = "Binary files (*.bin)|*.bin|All files (*.*)|*.*", FileName = "eeprom-dump.bin" };
         if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        if (!TryStartBusy())
         {
             return;
         }
@@ -282,6 +330,10 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = $"Raw read failed: {ex.Message}";
         }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     [RelayCommand]
@@ -299,6 +351,11 @@ public partial class MainViewModel : ObservableObject
         }
 
         if (!ConfirmDelete($"Write {new FileInfo(dialog.FileName).Length} bytes to radio EEPROM starting at 0x{address:X4}? This can corrupt the radio's programming if the range is wrong."))
+        {
+            return;
+        }
+
+        if (!TryStartBusy())
         {
             return;
         }
@@ -321,6 +378,22 @@ public partial class MainViewModel : ObservableObject
         {
             StatusMessage = $"Raw write failed: {ex.Message}";
         }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool TryStartBusy()
+    {
+        if (IsBusy)
+        {
+            StatusMessage = "Another radio operation is already in progress.";
+            return false;
+        }
+
+        IsBusy = true;
+        return true;
     }
 
     private bool TryParseRawMemoryAddress(out int address)

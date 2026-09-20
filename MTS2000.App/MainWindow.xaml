@@ -42,9 +42,9 @@
                 <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding IsConnected, Converter={StaticResource InverseBooleanConverter}}" />
                 <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
                 <Separator />
-                <Button Content="Get Firmware Version" Command="{Binding GetFirmwareVersionCommand}" IsEnabled="{Binding IsConnected}" />
-                <Button Content="Read from Radio" Command="{Binding ReadFromRadioCommand}" IsEnabled="{Binding IsConnected}" />
-                <Button Content="Write to Radio" Command="{Binding WriteToRadioCommand}" IsEnabled="{Binding IsConnected}" />
+                <Button Content="Get Firmware Version" Command="{Binding GetFirmwareVersionCommand}" IsEnabled="{Binding CanOperateRadio}" />
+                <Button Content="Read from Radio" Command="{Binding ReadFromRadioCommand}" IsEnabled="{Binding CanOperateRadio}" />
+                <Button Content="Write to Radio" Command="{Binding WriteToRadioCommand}" IsEnabled="{Binding CanOperateRadio}" />
             </ToolBar>
         </ToolBarTray>
 
@@ -141,9 +141,9 @@
 
                     <StackPanel Orientation="Horizontal">
                         <Button Content="Read to .bin File..." Padding="8,4" Margin="0,0,8,0"
-                                Command="{Binding ReadRawMemoryCommand}" IsEnabled="{Binding IsConnected}" />
+                                Command="{Binding ReadRawMemoryCommand}" IsEnabled="{Binding CanOperateRadio}" />
                         <Button Content="Write from .bin File..." Padding="8,4"
-                                Command="{Binding WriteRawMemoryCommand}" IsEnabled="{Binding IsConnected}" />
+                                Command="{Binding WriteRawMemoryCommand}" IsEnabled="{Binding CanOperateRadio}" />
                     </StackPanel>
                 </StackPanel>
             </TabItem>
