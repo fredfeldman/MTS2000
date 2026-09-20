@@ -7,6 +7,8 @@ A WPF (.NET) codeplug editor and programming utility for the Motorola MTS2000
 
 Repository: https://github.com/fredfeldman/MTS2000
 
+![MTS2000 Radio Programmer screenshot](docs/screenshot.png)
+
 ## What it does
 
 - Edit a codeplug (zones, channels, frequencies, tones, bandwidth, scan settings) in a
