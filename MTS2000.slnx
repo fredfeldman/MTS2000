@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MTS2000.App/MTS2000.App.csproj" />
+  <Project Path="MTS2000.Core/MTS2000.Core.csproj" />
+</Solution>

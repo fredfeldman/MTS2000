@@ -1,0 +1,90 @@
+using System.IO.Ports;
+using MTS2000.Core.Models;
+using MTS2000.Core.Protocol;
+
+namespace MTS2000.Core.Services;
+
+/// <inheritdoc cref="IRadioCommunicationService"/>
+public class SerialRadioCommunicationService : IRadioCommunicationService, IDisposable
+{
+    private RadioProgrammingSession? _session;
+
+    public RadioConnectionState State { get; private set; } = RadioConnectionState.Disconnected;
+
+    public IReadOnlyList<string> GetAvailablePortNames() => SerialPort.GetPortNames();
+
+    public void Connect(string portName, int baudRate = 9600)
+    {
+        _session?.Dispose();
+        _session = new RadioProgrammingSession(portName);
+        State = RadioConnectionState.Connected;
+    }
+
+    public void Disconnect()
+    {
+        _session?.Dispose();
+        _session = null;
+        State = RadioConnectionState.Disconnected;
+    }
+
+    /// <summary>Puts the radio in programming mode and reads back its firmware version, proving the control-bus link is alive.</summary>
+    public Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
+    {
+        var session = EnsureConnected();
+        return Task.Run(() =>
+        {
+            session.EnterProgrammingMode();
+            return session.QueryFirmwareVersion();
+        }, cancellationToken);
+    }
+
+    public Task<byte[]> ReadMemoryAsync(int address, int length, CancellationToken cancellationToken = default)
+    {
+        var session = EnsureConnected();
+        return Task.Run(() => session.ReadEeprom(address, length), cancellationToken);
+    }
+
+    public Task WriteMemoryAsync(int address, byte[] data, CancellationToken cancellationToken = default)
+    {
+        var session = EnsureConnected();
+        return Task.Run(() => session.WriteEeprom(address, data), cancellationToken);
+    }
+
+    public Task<Codeplug> ReadCodeplugAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    {
+        EnsureConnected();
+
+        // The control-bus/extended-protocol transport above is real and working (see
+        // RadioProgrammingSession), but decoding the ~33KB EEPROM blob into channels/zones
+        // requires the MTS2000's full codeplug block map (internal/external block hierarchy,
+        // vector refs, per-block checksums, and the Toolproof auth code), not implemented here.
+        throw new NotSupportedException(
+            "Reading a codeplug from the radio requires the MTS2000 codeplug block format, which is not yet implemented. " +
+            "Low-level memory access is available via ReadMemoryAsync.");
+    }
+
+    public Task WriteCodeplugAsync(Codeplug codeplug, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    {
+        EnsureConnected();
+
+        throw new NotSupportedException(
+            "Writing a codeplug to the radio requires the MTS2000 codeplug block format, which is not yet implemented. " +
+            "Low-level memory access is available via WriteMemoryAsync.");
+    }
+
+    private RadioProgrammingSession EnsureConnected()
+    {
+        if (State != RadioConnectionState.Connected || _session is null)
+        {
+            throw new InvalidOperationException("Not connected to a radio. Call Connect first.");
+        }
+
+        return _session;
+    }
+
+    public void Dispose()
+    {
+        Disconnect();
+        GC.SuppressFinalize(this);
+    }
+}
