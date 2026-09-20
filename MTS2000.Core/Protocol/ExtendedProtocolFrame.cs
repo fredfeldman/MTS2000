@@ -45,9 +45,10 @@ public sealed class ExtendedProtocolFrame
         // The wire "length" counts the payload plus the trailing checksum byte.
         var wireLength = payload.Length + 1;
 
+        // Each nibble saturates at 0x0f as a sentinel meaning "see the following byte(s) instead".
         var header = new List<byte>(4)
         {
-            (byte)(Math.Min(ShortFieldLimit, (int)command) * 16 + Math.Min(ShortFieldLimit, wireLength)),
+            (byte)(Math.Min(0x0f, (int)command) * 16 + Math.Min(0x0f, wireLength)),
         };
 
         if (command > ShortFieldLimit)

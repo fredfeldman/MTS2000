@@ -7,7 +7,7 @@ public class Codeplug
 {
     public RadioSettings Settings { get; set; } = new();
 
-    public ObservableCollection<Zone> Zones { get; } = new();
+    public ObservableCollection<Zone> Zones { get; set; } = new();
 
     public static Codeplug CreateDefault()
     {

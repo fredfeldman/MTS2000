@@ -9,5 +9,5 @@ public partial class Zone : ObservableObject
     [ObservableProperty]
     private string _name = "New Zone";
 
-    public ObservableCollection<Channel> Channels { get; } = new();
+    public ObservableCollection<Channel> Channels { get; set; } = new();
 }

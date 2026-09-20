@@ -1,4 +1,4 @@
-# MTS2000 Radio Programmer
+# MTS2000 Radio Programmer - Under development
 
 A WPF (.NET) codeplug editor and programming utility for the Motorola MTS2000
 ("Jedi" series) portable radio.
