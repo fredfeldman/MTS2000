@@ -123,6 +123,30 @@
                     <CheckBox Content="Power-On Self-Test Enabled" IsChecked="{Binding PowerOnSelfTestEnabled}" />
                 </StackPanel>
             </TabItem>
+
+            <TabItem Header="Raw Memory (Advanced)">
+                <StackPanel Margin="12" MaxWidth="480" HorizontalAlignment="Left">
+                    <TextBlock TextWrapping="Wrap" Margin="0,0,0,12">
+                        Reads or writes a raw range of the radio's EEPROM to/from a .bin file. This does
+                        not decode channels/zones (that codeplug block format isn't implemented yet) -
+                        it's a low-level backup/restore tool. Writing untested ranges can leave the
+                        radio needing to be reprogrammed from a known-good backup.
+                    </TextBlock>
+
+                    <TextBlock Text="Start Address (hex)" />
+                    <TextBox Text="{Binding RawMemoryAddressHex, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+
+                    <TextBlock Text="Length (bytes, for read)" />
+                    <TextBox Text="{Binding RawMemoryLength, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Read to .bin File..." Padding="8,4" Margin="0,0,8,0"
+                                Command="{Binding ReadRawMemoryCommand}" IsEnabled="{Binding IsConnected}" />
+                        <Button Content="Write from .bin File..." Padding="8,4"
+                                Command="{Binding WriteRawMemoryCommand}" IsEnabled="{Binding IsConnected}" />
+                    </StackPanel>
+                </StackPanel>
+            </TabItem>
         </TabControl>
 
         <StatusBar Grid.Row="2">
