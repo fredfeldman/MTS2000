@@ -1,5 +1,7 @@
 # MTS2000 Radio Programmer - Under development
 
+[![CI](https://github.com/fredfeldman/MTS2000/actions/workflows/ci.yml/badge.svg)](https://github.com/fredfeldman/MTS2000/actions/workflows/ci.yml)
+
 A WPF (.NET) codeplug editor and programming utility for the Motorola MTS2000
 ("Jedi" series) portable radio.
 
