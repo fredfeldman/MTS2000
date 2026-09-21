@@ -8,7 +8,7 @@
         xmlns:models="clr-namespace:MTS2000.Core.Models;assembly=MTS2000.Core"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
-        Title="MTS2000 Radio Programmer" Height="600" Width="960">
+        Title="MTS2000 Radio Programmer" Height="600" Width="960" MinHeight="450" MinWidth="700">
     <Window.Resources>
         <converters:InverseBooleanConverter x:Key="InverseBooleanConverter" />
         <converters:NullToBooleanConverter x:Key="NullToBooleanConverter" />
@@ -35,20 +35,20 @@
         <!-- Toolbar -->
         <ToolBarTray Grid.Row="0">
             <ToolBar>
-                <Button Content="Open Codeplug..." Command="{Binding OpenCodeplugCommand}" />
-                <Button Content="Save Codeplug..." Command="{Binding SaveCodeplugCommand}" />
+                <Button Command="{Binding OpenCodeplugCommand}"><AccessText Text="_Open Codeplug..." /></Button>
+                <Button Command="{Binding SaveCodeplugCommand}"><AccessText Text="_Save Codeplug..." /></Button>
                 <Separator />
                 <TextBlock Text="Port:" VerticalAlignment="Center" Margin="4,0" />
                 <ComboBox Width="100" ItemsSource="{Binding AvailablePortNames}" SelectedItem="{Binding SelectedPortName}" />
                 <TextBlock Text="No ports found - plug in your cable and click Refresh" VerticalAlignment="Center" Margin="4,0"
                            Foreground="Gray" FontStyle="Italic" Visibility="{Binding HasNoAvailablePorts, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                <Button Content="Refresh" Command="{Binding RefreshPortsCommand}" />
-                <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}" />
-                <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
+                <Button Command="{Binding RefreshPortsCommand}"><AccessText Text="re_Fresh" /></Button>
+                <Button Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"><AccessText Text="_Connect" /></Button>
+                <Button Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}"><AccessText Text="_Disconnect" /></Button>
                 <Separator />
-                <Button Content="Get Firmware Version" Command="{Binding GetFirmwareVersionCommand}" IsEnabled="{Binding CanOperateRadio}" />
-                <Button Content="Read from Radio" Command="{Binding ReadFromRadioCommand}" IsEnabled="{Binding CanOperateRadio}" />
-                <Button Content="Write to Radio" Command="{Binding WriteToRadioCommand}" IsEnabled="{Binding CanOperateRadio}" />
+                <Button Command="{Binding GetFirmwareVersionCommand}" IsEnabled="{Binding CanOperateRadio}"><AccessText Text="_Get Firmware Version" /></Button>
+                <Button Command="{Binding ReadFromRadioCommand}" IsEnabled="{Binding CanOperateRadio}"><AccessText Text="_Read from Radio" /></Button>
+                <Button Command="{Binding WriteToRadioCommand}" IsEnabled="{Binding CanOperateRadio}"><AccessText Text="_Write to Radio" /></Button>
             </ToolBar>
         </ToolBarTray>
 
@@ -56,9 +56,11 @@
             <TabItem Header="Zones and Channels">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="200" />
-                        <ColumnDefinition Width="220" />
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="200" MinWidth="120" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="220" MinWidth="120" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" MinWidth="200" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Zone list -->
@@ -72,8 +74,10 @@
                         <ListBox ItemsSource="{Binding Codeplug.Zones}" SelectedItem="{Binding SelectedZone}" DisplayMemberPath="Name" />
                     </DockPanel>
 
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="LightGray" />
+
                     <!-- Channel list -->
-                    <DockPanel Grid.Column="1" Margin="4">
+                    <DockPanel Grid.Column="2" Margin="4">
                         <TextBlock Text="Channels" FontWeight="Bold" DockPanel.Dock="Top" Margin="0,0,0,4" />
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
                             <Button Content="Add" Width="60" Margin="0,0,4,0" Command="{Binding AddChannelCommand}" />
@@ -83,8 +87,10 @@
                         <ListBox ItemsSource="{Binding SelectedZone.Channels}" SelectedItem="{Binding SelectedChannel}" DisplayMemberPath="Name" />
                     </DockPanel>
 
+                    <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="LightGray" />
+
                     <!-- Channel editor -->
-                    <Grid Grid.Column="2" Margin="12,4,4,4">
+                    <Grid Grid.Column="4" Margin="12,4,4,4">
                         <TextBlock Text="Select or add a channel to view or edit its details." Foreground="Gray" FontStyle="Italic"
                                    Visibility="{Binding SelectedChannel, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}" />
                         <StackPanel DataContext="{Binding SelectedChannel}"
@@ -95,10 +101,26 @@
                             <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
                             <TextBlock Text="Receive Frequency (MHz)" />
-                            <TextBox Text="{Binding ReceiveFrequencyMhz, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBox Margin="0,0,0,8">
+                                <TextBox.Text>
+                                    <Binding Path="ReceiveFrequencyMhz" UpdateSourceTrigger="PropertyChanged">
+                                        <Binding.ValidationRules>
+                                            <converters:RangeValidationRule Min="0.001" Max="1000" />
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </TextBox.Text>
+                            </TextBox>
 
                             <TextBlock Text="Transmit Frequency (MHz)" />
-                            <TextBox Text="{Binding TransmitFrequencyMhz, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                            <TextBox Margin="0,0,0,8">
+                                <TextBox.Text>
+                                    <Binding Path="TransmitFrequencyMhz" UpdateSourceTrigger="PropertyChanged">
+                                        <Binding.ValidationRules>
+                                            <converters:RangeValidationRule Min="0.001" Max="1000" />
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </TextBox.Text>
+                            </TextBox>
 
                             <TextBlock Text="Receive Tone" />
                             <TextBox Text="{Binding ReceiveTone, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
@@ -127,7 +149,15 @@
                     <TextBox Text="{Binding RadioId, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
                     <TextBlock Text="Squelch Level (0-9)" />
-                    <TextBox Text="{Binding SquelchLevel, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
+                    <TextBox Margin="0,0,0,8">
+                        <TextBox.Text>
+                            <Binding Path="SquelchLevel" UpdateSourceTrigger="PropertyChanged">
+                                <Binding.ValidationRules>
+                                    <converters:RangeValidationRule Min="0" Max="9" />
+                                </Binding.ValidationRules>
+                            </Binding>
+                        </TextBox.Text>
+                    </TextBox>
 
                     <CheckBox Content="Keypad Lock Enabled" IsChecked="{Binding KeypadLockEnabled}" Margin="0,0,0,8" />
                     <CheckBox Content="Power-On Self-Test Enabled" IsChecked="{Binding PowerOnSelfTestEnabled}" />
@@ -147,7 +177,15 @@
                     <TextBox Text="{Binding RawMemoryAddressHex, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
                     <TextBlock Text="Length (bytes, for read)" />
-                    <TextBox Text="{Binding RawMemoryLength, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                    <TextBox Margin="0,0,0,12">
+                        <TextBox.Text>
+                            <Binding Path="RawMemoryLength" UpdateSourceTrigger="PropertyChanged">
+                                <Binding.ValidationRules>
+                                    <converters:RangeValidationRule Min="1" Max="65536" />
+                                </Binding.ValidationRules>
+                            </Binding>
+                        </TextBox.Text>
+                    </TextBox>
 
                     <StackPanel Orientation="Horizontal">
                         <Button Content="Read to .bin File..." Padding="8,4" Margin="0,0,8,0"
@@ -162,6 +200,10 @@
         <StatusBar Grid.Row="2">
             <StatusBarItem>
                 <TextBlock Text="{Binding StatusMessage}" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <ProgressBar Width="100" Height="14" IsIndeterminate="True"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" />
             </StatusBarItem>
         </StatusBar>
     </Grid>
