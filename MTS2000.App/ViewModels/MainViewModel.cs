@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -48,6 +49,18 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private int _rawMemoryLength = 256;
+
+    [ObservableProperty]
+    private string _fixtureModel = string.Empty;
+
+    [ObservableProperty]
+    private string _fixtureBand = string.Empty;
+
+    [ObservableProperty]
+    private string _fixtureSerialNumber = string.Empty;
+
+    [ObservableProperty]
+    private string _fixtureFirmwareSignatureHex = string.Empty;
 
     /// <summary>True once the codeplug has been edited since it was created/loaded/saved.</summary>
     [ObservableProperty]
@@ -432,13 +445,13 @@ public partial class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            _radioService.Disconnect();
+            InvalidateRadioConnection();
             StatusMessage = "Connection cancelled.";
             _debugLog.Warning($"Connect cancelled for {portName}.");
         }
         catch (Exception ex)
         {
-            _radioService.Disconnect();
+            InvalidateRadioConnection();
             StatusMessage = $"Failed to connect: {ex.Message}";
             _debugLog.Error($"Connect failed for {portName}.", ex);
         }
@@ -780,6 +793,120 @@ public partial class MainViewModel : ObservableObject
         {
             FinishBusy();
         }
+    }
+
+    /// <summary>
+    /// Captures a read-only fixture package for implementing and validating the codeplug codec.
+    /// The package contains the complete EEPROM image, radio metadata, firmware signature input,
+    /// and the editor's current expected decoded model. It never writes to the radio.
+    /// </summary>
+    [RelayCommand]
+    private async Task CaptureCodeplugFixtureAsync()
+    {
+        if (!TryValidateFixtureMetadata())
+        {
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Fixture manifest (*.json)|*.json",
+            FileName = "mts2000-fixture.json",
+        };
+        if (dialog.ShowDialog() != true || !TryStartBusy())
+        {
+            return;
+        }
+
+        var manifestPath = dialog.FileName;
+        var directory = Path.GetDirectoryName(manifestPath)!;
+        var stem = Path.GetFileNameWithoutExtension(manifestPath);
+        var dumpPath = Path.Combine(directory, $"{stem}.eeprom.bin");
+        var expectedPath = Path.Combine(directory, $"{stem}.expected-codeplug.json");
+
+        try
+        {
+            _debugLog.Info($"Codeplug fixture capture started: manifest={manifestPath}.");
+            StatusMessage = "Querying firmware version for fixture...";
+            var firmwareVersion = await _radioService.GetFirmwareVersionAsync(OperationCancellationToken);
+
+            const int imageLength = 0x8200;
+            var image = new byte[imageLength];
+            var offset = 0;
+            while (offset < image.Length)
+            {
+                OperationCancellationToken.ThrowIfCancellationRequested();
+                var chunkSize = Math.Min(0xFF, image.Length - offset);
+                StatusMessage = $"Capturing EEPROM 0x{offset:X4} ({offset + chunkSize}/{image.Length})...";
+                var chunk = await _radioService.ReadMemoryAsync(offset, chunkSize, OperationCancellationToken);
+                if (chunk.Length != chunkSize)
+                {
+                    throw new InvalidDataException("Radio returned an unexpected byte count during fixture capture.");
+                }
+
+                chunk.CopyTo(image, offset);
+                offset += chunkSize;
+            }
+
+            var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+            await File.WriteAllBytesAsync(dumpPath, image, OperationCancellationToken);
+            await File.WriteAllTextAsync(expectedPath, JsonSerializer.Serialize(Codeplug, jsonOptions), OperationCancellationToken);
+
+            var manifest = new
+            {
+                Format = "MTS2000 codeplug fixture v1",
+                CapturedAt = DateTimeOffset.Now,
+                Model = FixtureModel.Trim(),
+                Band = FixtureBand.Trim(),
+                SerialNumber = FixtureSerialNumber.Trim(),
+                FirmwareVersion = firmwareVersion,
+                FirmwareSignatureHex = FixtureFirmwareSignatureHex.Trim().Replace(" ", string.Empty),
+                EepromImageLength = image.Length,
+                EepromImageFile = Path.GetFileName(dumpPath),
+                ExpectedDecodedCodeplugFile = Path.GetFileName(expectedPath),
+                WriteValidation = "Read-only capture. Do not enable writes until decode/encode round-trip matches the EEPROM image.",
+            };
+
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(manifest, jsonOptions), OperationCancellationToken);
+            StatusMessage = $"Fixture captured: {Path.GetFileName(manifestPath)}.";
+            _debugLog.Info($"Codeplug fixture capture completed: manifest={manifestPath}, imageLength={image.Length}.");
+        }
+        catch (OperationCanceledException)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = "Fixture capture cancelled.";
+            _debugLog.Warning("Codeplug fixture capture cancelled.");
+        }
+        catch (Exception ex)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = $"Fixture capture failed: {ex.Message}";
+            _debugLog.Error("Codeplug fixture capture failed.", ex);
+        }
+        finally
+        {
+            FinishBusy();
+        }
+    }
+
+    private bool TryValidateFixtureMetadata()
+    {
+        if (string.IsNullOrWhiteSpace(FixtureModel) ||
+            string.IsNullOrWhiteSpace(FixtureBand) ||
+            string.IsNullOrWhiteSpace(FixtureSerialNumber))
+        {
+            StatusMessage = "Enter the fixture model, band, and serial number first.";
+            return false;
+        }
+
+        var signature = FixtureFirmwareSignatureHex.Replace(" ", string.Empty);
+        if (!signature.All(Uri.IsHexDigit) || signature.Length == 0 || signature.Length % 2 != 0)
+        {
+            StatusMessage = "Enter firmware signature bytes as an even-length hexadecimal string.";
+            return false;
+        }
+
+        return true;
     }
 
     private bool TryStartBusy()

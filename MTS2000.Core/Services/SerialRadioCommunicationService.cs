@@ -7,6 +7,7 @@ namespace MTS2000.Core.Services;
 /// <inheritdoc cref="IRadioCommunicationService"/>
 public class SerialRadioCommunicationService : IRadioCommunicationService, IDisposable
 {
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
     private RadioProgrammingSession? _session;
 
     public RadioConnectionState State { get; private set; } = RadioConnectionState.Disconnected;
@@ -17,16 +18,40 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
 
     public void Connect(string portName, int baudRate = 9600)
     {
-        DetachSession();
-        _session = new RadioProgrammingSession(portName, baudRate);
-        _session.StatusChanged += OnSessionStatusChanged;
-        State = RadioConnectionState.HandshakePending;
+        _operationGate.Wait();
+        try
+        {
+            DetachSession();
+            State = RadioConnectionState.Disconnected;
+
+            var session = new RadioProgrammingSession(portName, baudRate);
+            session.StatusChanged += OnSessionStatusChanged;
+            _session = session;
+            State = RadioConnectionState.HandshakePending;
+        }
+        catch
+        {
+            State = RadioConnectionState.Disconnected;
+            throw;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     public void Disconnect()
     {
-        DetachSession();
-        State = RadioConnectionState.Disconnected;
+        _operationGate.Wait();
+        try
+        {
+            DetachSession();
+            State = RadioConnectionState.Disconnected;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     private void DetachSession()
@@ -47,22 +72,46 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
     /// Puts the radio in programming mode first if that hasn't happened yet this session.</summary>
     public async Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
     {
-        var session = EnsureSession();
-        var version = await Task.Run(() => session.QueryFirmwareVersion(cancellationToken), cancellationToken);
-        State = RadioConnectionState.Connected;
-        return version;
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var session = EnsureSession();
+            var version = await Task.Run(() => session.QueryFirmwareVersion(cancellationToken), cancellationToken);
+            State = RadioConnectionState.Connected;
+            return version;
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
-    public Task<byte[]> ReadMemoryAsync(int address, int length, CancellationToken cancellationToken = default)
+    public async Task<byte[]> ReadMemoryAsync(int address, int length, CancellationToken cancellationToken = default)
     {
-        var session = EnsureConnected();
-        return Task.Run(() => session.ReadEeprom(address, length, cancellationToken), cancellationToken);
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var session = EnsureConnected();
+            return await Task.Run(() => session.ReadEeprom(address, length, cancellationToken), cancellationToken);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
-    public Task WriteMemoryAsync(int address, byte[] data, CancellationToken cancellationToken = default)
+    public async Task WriteMemoryAsync(int address, byte[] data, CancellationToken cancellationToken = default)
     {
-        var session = EnsureConnected();
-        return Task.Run(() => session.WriteEeprom(address, data, cancellationToken), cancellationToken);
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var session = EnsureConnected();
+            await Task.Run(() => session.WriteEeprom(address, data, cancellationToken), cancellationToken);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     public Task<Codeplug> ReadCodeplugAsync(CancellationToken cancellationToken = default)
@@ -110,6 +159,7 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
     public void Dispose()
     {
         Disconnect();
+        _operationGate.Dispose();
         GC.SuppressFinalize(this);
     }
 }

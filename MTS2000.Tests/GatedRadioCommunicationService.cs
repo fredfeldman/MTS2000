@@ -16,15 +16,25 @@ public sealed class GatedRadioCommunicationService : IRadioCommunicationService
 
     public bool FailFirmwareVersion { get; set; }
 
+    public bool FailConnect { get; set; }
+
     public RadioConnectionState State { get; private set; } = RadioConnectionState.Disconnected;
 
 #pragma warning disable CS0067 // required by IRadioCommunicationService, unused in this fake
     public event EventHandler<string>? StatusChanged;
 #pragma warning restore CS0067
 
-    public IReadOnlyList<string> GetAvailablePortNames() => [];
+    public IReadOnlyList<string> GetAvailablePortNames() => ["FAKE"];
 
-    public void Connect(string portName, int baudRate = 9600) => State = RadioConnectionState.Connected;
+    public void Connect(string portName, int baudRate = 9600)
+    {
+        if (FailConnect)
+        {
+            throw new InvalidOperationException("simulated connection failure");
+        }
+
+        State = RadioConnectionState.Connected;
+    }
 
     public void Disconnect() => State = RadioConnectionState.Disconnected;
 

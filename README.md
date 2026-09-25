@@ -19,6 +19,9 @@ Repository: https://github.com/fredfeldman/MTS2000
 - Low-level EEPROM memory read/write primitives for the real SB9600/SBEP transport.
 - Raw EEPROM backup/restore: read an address range to a `.bin` file, or write a `.bin` file
   back to the radio (this does not decode channels/zones - see below).
+- Read-only fixture capture: records a complete `0x8200`-byte EEPROM image, firmware version,
+  radio metadata, firmware signature bytes, and the editor's expected decoded JSON for codec
+  development.
 - Remembers the last-used COM port between sessions and confirms before deleting a zone
   or channel.
 
@@ -30,6 +33,22 @@ per-block checksums, and the "Toolproof" auth-code algorithm). That has not been
 into this project, so `ReadCodeplugAsync`/`WriteCodeplugAsync` currently throw
 `NotSupportedException`. The transport layer they'd sit on (`RadioProgrammingSession`) is
 real and working — see [Protocol reference](#protocol-reference) below.
+
+### Capturing a codec fixture
+
+After connecting and completing the firmware handshake, use **Raw Memory (Advanced) > Capture
+read-only codeplug fixture...**. Enter the radio model, band, serial number, and matching
+firmware signature bytes first. The selected manifest filename produces three files:
+
+- `*.eeprom.bin`: exactly `0x8200` bytes read from EEPROM address `0x0000`.
+- `*.expected-codeplug.json`: the current editor model, containing expected zone/channel values.
+- `*.json`: metadata linking the image and expected model, including firmware version and the
+  round-trip requirement.
+
+This workflow never writes to the radio. The expected JSON should contain values independently
+verified from the radio or an authoritative programming source before it is used as a codec test
+oracle. Do not enable structured writes until decoding and re-encoding the binary produces the
+same known-good image.
 
 ## Project layout
 

@@ -62,6 +62,21 @@ public class MainViewModelTests : IDisposable
         Assert.Equal(RadioConnectionState.Disconnected, radioService.State);
     }
 
+    [Fact]
+    public async Task ConnectFailure_ClearsConnectionState()
+    {
+        var radioService = new GatedRadioCommunicationService { FailConnect = true };
+        var viewModel = new MainViewModel(radioService, new DebugLogService(_logDirectory))
+        {
+            SelectedPortName = "FAKE",
+        };
+
+        await viewModel.ConnectCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsConnected);
+        Assert.Equal(RadioConnectionState.Disconnected, radioService.State);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_logDirectory))
