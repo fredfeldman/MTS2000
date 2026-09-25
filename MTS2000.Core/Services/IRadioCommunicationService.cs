@@ -4,6 +4,7 @@ namespace MTS2000.Core.Services;
 public enum RadioConnectionState
 {
     Disconnected,
+    HandshakePending,
     Connected,
 }
 

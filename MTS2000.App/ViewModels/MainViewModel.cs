@@ -16,6 +16,8 @@ public partial class MainViewModel : ObservableObject
     private readonly CodeplugFileService _fileService = new();
     private readonly IRadioCommunicationService _radioService;
     private readonly AppSettings _appSettings = AppSettings.Load();
+    private readonly DebugLogService _debugLog;
+    private CancellationTokenSource? _operationCancellationSource;
 
     [ObservableProperty]
     private Codeplug _codeplug = Codeplug.CreateDefault();
@@ -31,6 +33,9 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _statusMessage = "Ready.";
+
+    [ObservableProperty]
+    private string _logText = string.Empty;
 
     [ObservableProperty]
     private bool _isConnected;
@@ -64,19 +69,32 @@ public partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(CanOperateRadio));
         OnPropertyChanged(nameof(CanConnect));
+        OnPropertyChanged(nameof(CanCancelOperation));
+        CancelOperationCommand.NotifyCanExecuteChanged();
     }
 
     public IReadOnlyList<string> AvailablePortNames => _radioService.GetAvailablePortNames();
 
     public bool HasNoAvailablePorts => AvailablePortNames.Count == 0;
 
+    private CancellationToken OperationCancellationToken =>
+        _operationCancellationSource?.Token ?? CancellationToken.None;
+
+    public bool CanCancelOperation => IsBusy;
+
+    public string LogFilePath => _debugLog.CurrentLogPath;
+
     public MainViewModel() : this(new SerialRadioCommunicationService())
     {
     }
 
-    public MainViewModel(IRadioCommunicationService radioService)
+    public MainViewModel(IRadioCommunicationService radioService, DebugLogService? debugLog = null)
     {
         _radioService = radioService;
+        _debugLog = debugLog ?? new DebugLogService();
+        _debugLog.LogWritten += OnLogWritten;
+        _debugLog.Info("Application session initialized.");
+        RefreshLogText();
         _radioService.StatusChanged += OnRadioStatusChanged;
         AttachDirtyTracking(Codeplug);
         SelectedZone = Codeplug.Zones.FirstOrDefault();
@@ -203,12 +221,26 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Called from the window's Closing handler; returns false if the close should be cancelled.</summary>
-    public bool ConfirmClose() => ConfirmDiscardIfDirty("Close the application");
+    public bool ConfirmClose()
+    {
+        if (IsBusy)
+        {
+            MessageBox.Show(
+                "A radio operation is still in progress. Wait for it to finish before closing.",
+                "Operation in progress",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
+        return ConfirmDiscardIfDirty("Close the application");
+    }
 
     /// <summary>Forwards low-level protocol status (retries, timeouts, mode transitions) to the status bar.
     /// Raised from a background thread by the radio service, so it must hop to the UI thread.</summary>
     private void OnRadioStatusChanged(object? sender, string status)
     {
+        _debugLog.Info($"Radio status: {status}");
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null || dispatcher.CheckAccess())
         {
@@ -220,12 +252,38 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    private void OnLogWritten(object? sender, EventArgs e)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            RefreshLogText();
+        }
+        else
+        {
+            dispatcher.BeginInvoke(RefreshLogText);
+        }
+    }
+
+    private void RefreshLogText()
+    {
+        LogText = _debugLog.ReadCurrentLog();
+        OnPropertyChanged(nameof(LogFilePath));
+    }
+
+    [RelayCommand]
+    private void RefreshLog()
+    {
+        RefreshLogText();
+    }
+
     [RelayCommand]
     private void AddZone()
     {
         var zone = new Zone { Name = $"Zone {Codeplug.Zones.Count + 1}" };
         Codeplug.Zones.Add(zone);
         SelectedZone = zone;
+        _debugLog.Info($"Zone added: {zone.Name}.");
     }
 
     [RelayCommand]
@@ -244,6 +302,7 @@ public partial class MainViewModel : ObservableObject
 
         Codeplug.Zones.Remove(zone);
         SelectedZone = Codeplug.Zones.FirstOrDefault();
+        _debugLog.Info($"Zone removed: {zone.Name}.");
     }
 
     [RelayCommand]
@@ -257,6 +316,7 @@ public partial class MainViewModel : ObservableObject
         var channel = new Channel { Name = $"Channel {SelectedZone.Channels.Count + 1}" };
         SelectedZone.Channels.Add(channel);
         SelectedChannel = channel;
+        _debugLog.Info($"Channel added: {channel.Name} in zone {SelectedZone.Name}.");
     }
 
     [RelayCommand]
@@ -275,6 +335,7 @@ public partial class MainViewModel : ObservableObject
 
         SelectedZone.Channels.Remove(channel);
         SelectedChannel = SelectedZone.Channels.FirstOrDefault();
+        _debugLog.Info($"Channel removed: {channel.Name}.");
     }
 
     private static bool ConfirmDelete(string message) =>
@@ -300,10 +361,12 @@ public partial class MainViewModel : ObservableObject
             SelectedZone = Codeplug.Zones.FirstOrDefault();
             SelectedChannel = SelectedZone?.Channels.FirstOrDefault();
             StatusMessage = $"Loaded {Path.GetFileName(dialog.FileName)}.";
+            _debugLog.Info($"Codeplug loaded from {dialog.FileName}.");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to load codeplug: {ex.Message}";
+            _debugLog.Error($"Codeplug load failed: {dialog.FileName}.", ex);
         }
     }
 
@@ -321,10 +384,12 @@ public partial class MainViewModel : ObservableObject
             _fileService.Save(Codeplug, dialog.FileName);
             StatusMessage = $"Saved {Path.GetFileName(dialog.FileName)}.";
             IsDirty = false;
+            _debugLog.Info($"Codeplug saved to {dialog.FileName}.");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Failed to save codeplug: {ex.Message}";
+            _debugLog.Error($"Codeplug save failed: {dialog.FileName}.", ex);
         }
     }
 
@@ -333,6 +398,7 @@ public partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(AvailablePortNames));
         OnPropertyChanged(nameof(HasNoAvailablePorts));
+        _debugLog.Info($"Serial ports refreshed. Available: {AvailablePortNames.Count}.");
     }
 
     [RelayCommand]
@@ -350,22 +416,35 @@ public partial class MainViewModel : ObservableObject
         }
 
         var portName = SelectedPortName;
+        var cancellationToken = OperationCancellationToken;
         try
         {
+            _debugLog.Info($"Connect started for {portName}.");
             StatusMessage = $"Connecting to {portName}...";
-            await Task.Run(() => _radioService.Connect(portName));
+            await Task.Run(() => _radioService.Connect(portName), cancellationToken);
+            StatusMessage = "Verifying radio link...";
+            await _radioService.GetFirmwareVersionAsync(cancellationToken);
             IsConnected = true;
             StatusMessage = $"Connected to {portName}.";
             _appSettings.LastPortName = portName;
             _appSettings.Save();
+            _debugLog.Info($"Connect completed for {portName}. Firmware handshake succeeded.");
+        }
+        catch (OperationCanceledException)
+        {
+            _radioService.Disconnect();
+            StatusMessage = "Connection cancelled.";
+            _debugLog.Warning($"Connect cancelled for {portName}.");
         }
         catch (Exception ex)
         {
+            _radioService.Disconnect();
             StatusMessage = $"Failed to connect: {ex.Message}";
+            _debugLog.Error($"Connect failed for {portName}.", ex);
         }
         finally
         {
-            IsBusy = false;
+            FinishBusy();
         }
     }
 
@@ -381,6 +460,15 @@ public partial class MainViewModel : ObservableObject
         _radioService.Disconnect();
         IsConnected = false;
         StatusMessage = "Disconnected.";
+        _debugLog.Info("Radio disconnected by user.");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancelOperation))]
+    private void CancelOperation()
+    {
+        _operationCancellationSource?.Cancel();
+        StatusMessage = "Cancelling radio operation...";
+        _debugLog.Warning("Radio operation cancellation requested by user.");
     }
 
     /// <summary>
@@ -399,10 +487,12 @@ public partial class MainViewModel : ObservableObject
         try
         {
             _radioService.Disconnect();
+            _debugLog.Info("Application shutdown disconnected the radio.");
         }
         catch
         {
             // Best-effort on the way out; the process is exiting regardless.
+            _debugLog.Warning("Application shutdown could not disconnect the radio.");
         }
 
         IsConnected = false;
@@ -423,19 +513,29 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            _debugLog.Info("Structured codeplug read started.");
             StatusMessage = "Reading codeplug from radio...";
-            Codeplug = await _radioService.ReadCodeplugAsync();
+            Codeplug = await _radioService.ReadCodeplugAsync(OperationCancellationToken);
             SelectedZone = Codeplug.Zones.FirstOrDefault();
             SelectedChannel = SelectedZone?.Channels.FirstOrDefault();
             StatusMessage = "Read complete.";
+            _debugLog.Info("Structured codeplug read completed.");
+        }
+        catch (OperationCanceledException)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = "Read cancelled.";
+            _debugLog.Warning("Structured codeplug read cancelled.");
         }
         catch (Exception ex)
         {
+            InvalidateRadioConnection();
             StatusMessage = $"Read failed: {ex.Message}";
+            _debugLog.Error("Structured codeplug read failed.", ex);
         }
         finally
         {
-            IsBusy = false;
+            FinishBusy();
         }
     }
 
@@ -449,17 +549,27 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            _debugLog.Info("Firmware version query started.");
             StatusMessage = "Requesting firmware version...";
-            var version = await _radioService.GetFirmwareVersionAsync();
+            var version = await _radioService.GetFirmwareVersionAsync(OperationCancellationToken);
             StatusMessage = $"Radio firmware version: {version}";
+            _debugLog.Info($"Firmware version query completed: {version}.");
+        }
+        catch (OperationCanceledException)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = "Firmware version request cancelled.";
+            _debugLog.Warning("Firmware version query cancelled.");
         }
         catch (Exception ex)
         {
+            InvalidateRadioConnection();
             StatusMessage = $"Firmware version request failed: {ex.Message}";
+            _debugLog.Error("Firmware version query failed.", ex);
         }
         finally
         {
-            IsBusy = false;
+            FinishBusy();
         }
     }
 
@@ -473,17 +583,27 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            _debugLog.Info("Structured codeplug write started.");
             StatusMessage = "Writing codeplug to radio...";
-            await _radioService.WriteCodeplugAsync(Codeplug);
+            await _radioService.WriteCodeplugAsync(Codeplug, OperationCancellationToken);
             StatusMessage = "Write complete.";
+            _debugLog.Info("Structured codeplug write completed.");
+        }
+        catch (OperationCanceledException)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = "Write cancelled.";
+            _debugLog.Warning("Structured codeplug write cancelled.");
         }
         catch (Exception ex)
         {
+            InvalidateRadioConnection();
             StatusMessage = $"Write failed: {ex.Message}";
+            _debugLog.Error("Structured codeplug write failed.", ex);
         }
         finally
         {
-            IsBusy = false;
+            FinishBusy();
         }
     }
 
@@ -513,27 +633,43 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            _debugLog.Info($"Raw memory read started: address=0x{address:X4}, length={length}.");
             var buffer = new byte[length];
             var offset = 0;
             while (offset < length)
             {
+                OperationCancellationToken.ThrowIfCancellationRequested();
                 var chunkSize = Math.Min(0xFF, length - offset);
                 StatusMessage = $"Reading 0x{address + offset:X4} ({offset + chunkSize}/{length})...";
-                var chunk = await _radioService.ReadMemoryAsync(address + offset, chunkSize);
+                var chunk = await _radioService.ReadMemoryAsync(address + offset, chunkSize, OperationCancellationToken);
+                if (chunk.Length != chunkSize)
+                {
+                    throw new InvalidDataException("Radio returned an unexpected byte count during the raw read.");
+                }
+
                 chunk.CopyTo(buffer, offset);
                 offset += chunkSize;
             }
 
-            await File.WriteAllBytesAsync(dialog.FileName, buffer);
+            await File.WriteAllBytesAsync(dialog.FileName, buffer, OperationCancellationToken);
             StatusMessage = $"Saved {length} bytes from 0x{address:X4} to {Path.GetFileName(dialog.FileName)}.";
+            _debugLog.Info($"Raw memory read completed: address=0x{address:X4}, length={length}, file={dialog.FileName}.");
+        }
+        catch (OperationCanceledException)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = "Raw read cancelled.";
+            _debugLog.Warning($"Raw memory read cancelled: address=0x{address:X4}, length={length}.");
         }
         catch (Exception ex)
         {
+            InvalidateRadioConnection();
             StatusMessage = $"Raw read failed: {ex.Message}";
+            _debugLog.Error($"Raw memory read failed: address=0x{address:X4}, length={length}.", ex);
         }
         finally
         {
-            IsBusy = false;
+            FinishBusy();
         }
     }
 
@@ -551,7 +687,23 @@ public partial class MainViewModel : ObservableObject
             return;
         }
 
-        if (!ConfirmDelete($"Write {new FileInfo(dialog.FileName).Length} bytes to radio EEPROM starting at 0x{address:X4}? This can corrupt the radio's programming if the range is wrong."))
+        byte[] buffer;
+        try
+        {
+            buffer = await File.ReadAllBytesAsync(dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Raw write failed: {ex.Message}";
+            return;
+        }
+
+        if (!TryValidateRawMemoryRange(address, buffer.Length))
+        {
+            return;
+        }
+
+        if (!ConfirmDelete($"Write {buffer.Length} bytes to radio EEPROM starting at 0x{address:X4}? A backup will be saved beside the source file first."))
         {
             return;
         }
@@ -563,25 +715,70 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            var buffer = await File.ReadAllBytesAsync(dialog.FileName);
+            _debugLog.Info($"Raw memory write started: address=0x{address:X4}, length={buffer.Length}, source={dialog.FileName}.");
+            var backup = new byte[buffer.Length];
+            var backupOffset = 0;
+            while (backupOffset < backup.Length)
+            {
+                OperationCancellationToken.ThrowIfCancellationRequested();
+                var chunkSize = Math.Min(0xFF, backup.Length - backupOffset);
+                var chunk = await _radioService.ReadMemoryAsync(address + backupOffset, chunkSize, OperationCancellationToken);
+                if (chunk.Length != chunkSize)
+                {
+                    throw new InvalidDataException("Radio returned an unexpected byte count while creating the pre-write backup.");
+                }
+
+                chunk.CopyTo(backup, backupOffset);
+                backupOffset += chunkSize;
+            }
+
+            var backupPath = Path.Combine(
+                Path.GetDirectoryName(dialog.FileName)!,
+                $"{Path.GetFileNameWithoutExtension(dialog.FileName)}.before-write-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.bin");
+            await File.WriteAllBytesAsync(backupPath, backup, OperationCancellationToken);
+
             var offset = 0;
             while (offset < buffer.Length)
             {
+                OperationCancellationToken.ThrowIfCancellationRequested();
                 var chunkSize = Math.Min(0xFF, buffer.Length - offset);
                 StatusMessage = $"Writing 0x{address + offset:X4} ({offset + chunkSize}/{buffer.Length})...";
-                await _radioService.WriteMemoryAsync(address + offset, buffer[offset..(offset + chunkSize)]);
+                await _radioService.WriteMemoryAsync(address + offset, buffer[offset..(offset + chunkSize)], OperationCancellationToken);
                 offset += chunkSize;
             }
 
-            StatusMessage = $"Wrote {buffer.Length} bytes from {Path.GetFileName(dialog.FileName)} to 0x{address:X4}.";
+            var verifyOffset = 0;
+            while (verifyOffset < buffer.Length)
+            {
+                OperationCancellationToken.ThrowIfCancellationRequested();
+                var chunkSize = Math.Min(0xFF, buffer.Length - verifyOffset);
+                var actual = await _radioService.ReadMemoryAsync(address + verifyOffset, chunkSize, OperationCancellationToken);
+                if (!actual.SequenceEqual(buffer[verifyOffset..(verifyOffset + chunkSize)]))
+                {
+                    throw new InvalidDataException($"Read-back verification failed at 0x{address + verifyOffset:X4}.");
+                }
+
+                verifyOffset += chunkSize;
+            }
+
+            StatusMessage = $"Wrote and verified {buffer.Length} bytes. Backup: {Path.GetFileName(backupPath)}.";
+            _debugLog.Info($"Raw memory write completed and verified: address=0x{address:X4}, length={buffer.Length}, backup={backupPath}.");
+        }
+        catch (OperationCanceledException)
+        {
+            InvalidateRadioConnection();
+            StatusMessage = "Raw write cancelled.";
+            _debugLog.Warning($"Raw memory write cancelled: address=0x{address:X4}, length={buffer.Length}.");
         }
         catch (Exception ex)
         {
+            InvalidateRadioConnection();
             StatusMessage = $"Raw write failed: {ex.Message}";
+            _debugLog.Error($"Raw memory write failed: address=0x{address:X4}, length={buffer.Length}.", ex);
         }
         finally
         {
-            IsBusy = false;
+            FinishBusy();
         }
     }
 
@@ -593,8 +790,30 @@ public partial class MainViewModel : ObservableObject
             return false;
         }
 
+        _operationCancellationSource = new CancellationTokenSource();
         IsBusy = true;
         return true;
+    }
+
+    private void FinishBusy()
+    {
+        _operationCancellationSource?.Dispose();
+        _operationCancellationSource = null;
+        IsBusy = false;
+    }
+
+    private void InvalidateRadioConnection()
+    {
+        try
+        {
+            _radioService.Disconnect();
+        }
+        catch
+        {
+            // Preserve the original operation failure while making the UI fail closed.
+        }
+
+        IsConnected = false;
     }
 
     private bool TryParseRawMemoryAddress(out int address)
@@ -617,9 +836,20 @@ public partial class MainViewModel : ObservableObject
             return false;
         }
 
-        if (length < 1 || address + length > 0x10000)
+        if (!TryValidateRawMemoryRange(address, length))
         {
             StatusMessage = "Length must be positive and must not run past address 0xFFFF.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryValidateRawMemoryRange(int address, int length)
+    {
+        if (length < 1 || (long)address + length > 0x10000)
+        {
+            StatusMessage = "The file length must be positive and must not run past address 0xFFFF.";
             return false;
         }
 

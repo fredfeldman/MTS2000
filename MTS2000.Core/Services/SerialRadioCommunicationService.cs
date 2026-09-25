@@ -18,9 +18,9 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
     public void Connect(string portName, int baudRate = 9600)
     {
         DetachSession();
-        _session = new RadioProgrammingSession(portName);
+        _session = new RadioProgrammingSession(portName, baudRate);
         _session.StatusChanged += OnSessionStatusChanged;
-        State = RadioConnectionState.Connected;
+        State = RadioConnectionState.HandshakePending;
     }
 
     public void Disconnect()
@@ -45,22 +45,24 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
 
     /// <summary>Reads back the radio's firmware version, proving the control-bus link is alive.
     /// Puts the radio in programming mode first if that hasn't happened yet this session.</summary>
-    public Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
+    public async Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
     {
-        var session = EnsureConnected();
-        return Task.Run(session.QueryFirmwareVersion, cancellationToken);
+        var session = EnsureSession();
+        var version = await Task.Run(() => session.QueryFirmwareVersion(cancellationToken), cancellationToken);
+        State = RadioConnectionState.Connected;
+        return version;
     }
 
     public Task<byte[]> ReadMemoryAsync(int address, int length, CancellationToken cancellationToken = default)
     {
         var session = EnsureConnected();
-        return Task.Run(() => session.ReadEeprom(address, length), cancellationToken);
+        return Task.Run(() => session.ReadEeprom(address, length, cancellationToken), cancellationToken);
     }
 
     public Task WriteMemoryAsync(int address, byte[] data, CancellationToken cancellationToken = default)
     {
         var session = EnsureConnected();
-        return Task.Run(() => session.WriteEeprom(address, data), cancellationToken);
+        return Task.Run(() => session.WriteEeprom(address, data, cancellationToken), cancellationToken);
     }
 
     public Task<Codeplug> ReadCodeplugAsync(CancellationToken cancellationToken = default)
@@ -88,6 +90,16 @@ public class SerialRadioCommunicationService : IRadioCommunicationService, IDisp
     private RadioProgrammingSession EnsureConnected()
     {
         if (State != RadioConnectionState.Connected || _session is null)
+        {
+            throw new InvalidOperationException("Not connected to a radio. Call Connect first.");
+        }
+
+        return _session;
+    }
+
+    private RadioProgrammingSession EnsureSession()
+    {
+        if (State is not RadioConnectionState.Connected and not RadioConnectionState.HandshakePending || _session is null)
         {
             throw new InvalidOperationException("Not connected to a radio. Call Connect first.");
         }

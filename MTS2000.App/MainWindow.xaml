@@ -45,6 +45,7 @@
                 <Button Command="{Binding RefreshPortsCommand}"><AccessText Text="re_Fresh" /></Button>
                 <Button Command="{Binding ConnectCommand}" IsEnabled="{Binding CanConnect}"><AccessText Text="_Connect" /></Button>
                 <Button Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}"><AccessText Text="_Disconnect" /></Button>
+                <Button Command="{Binding CancelOperationCommand}" IsEnabled="{Binding CanCancelOperation}"><AccessText Text="_Cancel operation" /></Button>
                 <Separator />
                 <Button Command="{Binding GetFirmwareVersionCommand}" IsEnabled="{Binding CanOperateRadio}"><AccessText Text="_Get Firmware Version" /></Button>
                 <Button Command="{Binding ReadFromRadioCommand}" IsEnabled="{Binding CanOperateRadio}"><AccessText Text="_Read from Radio" /></Button>
@@ -194,6 +195,24 @@
                                 Command="{Binding WriteRawMemoryCommand}" IsEnabled="{Binding CanOperateRadio}" />
                     </StackPanel>
                 </StackPanel>
+            </TabItem>
+
+            <TabItem Header="Debug Log">
+                <DockPanel Margin="8">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Current diagnostic log" FontWeight="Bold" />
+                        <TextBlock Text="{Binding LogFilePath}" Foreground="Gray" TextTrimming="CharacterEllipsis" />
+                        <Button Content="Refresh" Width="80" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                Command="{Binding RefreshLogCommand}" />
+                    </StackPanel>
+                    <TextBox Text="{Binding LogText, Mode=OneWay}"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto" />
+                </DockPanel>
             </TabItem>
         </TabControl>
 

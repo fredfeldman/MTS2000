@@ -14,6 +14,8 @@ public sealed class GatedRadioCommunicationService : IRadioCommunicationService
 
     public int GetFirmwareVersionCallCount { get; private set; }
 
+    public bool FailFirmwareVersion { get; set; }
+
     public RadioConnectionState State { get; private set; } = RadioConnectionState.Disconnected;
 
 #pragma warning disable CS0067 // required by IRadioCommunicationService, unused in this fake
@@ -29,7 +31,12 @@ public sealed class GatedRadioCommunicationService : IRadioCommunicationService
     public async Task<decimal> GetFirmwareVersionAsync(CancellationToken cancellationToken = default)
     {
         GetFirmwareVersionCallCount++;
-        await _gate.Task;
+        if (FailFirmwareVersion)
+        {
+            throw new InvalidOperationException("simulated radio failure");
+        }
+
+        await _gate.Task.WaitAsync(cancellationToken);
         return 1.00M;
     }
 

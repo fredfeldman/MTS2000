@@ -78,4 +78,25 @@ public class RadioProgrammingSessionTests
 
         Assert.True(transport.SawEnterProgrammingMode);
     }
+
+    [Fact]
+    public void ReadEeprom_RejectsRangeThatCrossesTheAddressSpace()
+    {
+        using var transport = new FakeRadioTransport();
+        using var session = new RadioProgrammingSession(transport);
+
+        Assert.Throws<ArgumentException>(() => session.ReadEeprom(0xFFFF, 2));
+    }
+
+    [Fact]
+    public void ReadEeprom_HonorsCancellationBeforeTransportActivity()
+    {
+        using var transport = new FakeRadioTransport();
+        using var session = new RadioProgrammingSession(transport);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => session.ReadEeprom(0x0000, 1, cancellation.Token));
+        Assert.False(transport.SawEnterProgrammingMode);
+    }
 }
